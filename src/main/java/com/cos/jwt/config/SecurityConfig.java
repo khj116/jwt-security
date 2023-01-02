@@ -11,6 +11,7 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.context.SecurityContextPersistenceFilter;
@@ -24,17 +25,22 @@ public class SecurityConfig {
 
     private final CorsFilter corsConfig;
 
+    @Bean
+    public BCryptPasswordEncoder passwordEncoder(){
+        return new BCryptPasswordEncoder();
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        System.out.println(http.getSharedObject(AuthenticationManager.class));
         return http
                 .csrf().disable()
                 .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS) // 세션을 사용하지 않겠다.
                 .and()
-                .addFilter(corsConfig)
                 .formLogin().disable() // Form으로 로그인 하지 않겠다.
                 .httpBasic().disable() // http 통신을 하지 않겠다.
-                .addFilter(new JwtAuthenticationFilter(http.getSharedObject(AuthenticationManager.class)))
+                .apply(new MyCustomDsl())
+                .and()
                 .authorizeHttpRequests(auth -> {
                     try {
                         auth
@@ -53,6 +59,15 @@ public class SecurityConfig {
                 .build();
     }
 
+    public class MyCustomDsl extends AbstractHttpConfigurer<MyCustomDsl, HttpSecurity> {
+        @Override
+        public void configure(HttpSecurity http) throws Exception {
+            AuthenticationManager authenticationManager = http.getSharedObject(AuthenticationManager.class);
+            http
+                    .addFilter(corsConfig)
+                    .addFilter(new JwtAuthenticationFilter(authenticationManager));
+        }
+    }
 }
 
 
